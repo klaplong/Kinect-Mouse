@@ -174,7 +174,7 @@ void keyPressed(unsigned char key, int x, int y)
 			freenect_set_led(f_dev,LED_YELLOW);
 		break;
 		case '4':
-			freenect_set_led(f_dev,LED_BLINK_YELLOW);
+			freenect_set_led(f_dev,LED_BLINK_GREEN);
 		break;
 		case '5':
 			freenect_set_led(f_dev,LED_BLINK_GREEN);
@@ -262,7 +262,7 @@ void depth_cb(freenect_device *dev, void *v_depth, uint32_t timestamp)
 	uint16_t *depth = v_depth;
 
 	pthread_mutex_lock(&gl_backbuf_mutex);
-	for (i=0; i<FREENECT_FRAME_PIX; i++) {
+	for (i=0; i<640*480; i++) {
 		int pval = t_gamma[depth[i]];
 		int lb = pval & 0xff;
 		
@@ -351,7 +351,8 @@ void rgb_cb(freenect_device *dev, void *rgb, uint32_t timestamp)
 {
 	pthread_mutex_lock(&gl_backbuf_mutex);
 	got_frames++;
-	memcpy(gl_rgb_back, rgb, FREENECT_VIDEO_RGB_SIZE);
+//	memcpy(gl_rgb_back, rgb, FREENECT_VIDEO_RGB_SIZE);
+	memcpy(gl_rgb_back, rgb, 640*480*3);
 	pthread_cond_signal(&gl_frame_cond);
 	pthread_mutex_unlock(&gl_backbuf_mutex);
 }
@@ -362,8 +363,12 @@ void *freenect_threadfunc(void *arg)
 	freenect_set_led(f_dev,LED_GREEN);
 	freenect_set_depth_callback(f_dev, depth_cb);
 	freenect_set_video_callback(f_dev, rgb_cb);
-	freenect_set_video_format(f_dev, FREENECT_VIDEO_RGB);
-	freenect_set_depth_format(f_dev, FREENECT_DEPTH_11BIT);
+//	freenect_set_video_format(f_dev, FREENECT_VIDEO_RGB);
+//	freenect_set_depth_format(f_dev, FREENECT_DEPTH_11BIT);
+
+	freenect_set_video_mode(f_dev, freenect_find_video_mode(FREENECT_RESOLUTION_MEDIUM, FREENECT_VIDEO_RGB));
+	freenect_set_depth_mode(f_dev, freenect_find_depth_mode(FREENECT_RESOLUTION_MEDIUM, FREENECT_DEPTH_11BIT));
+
 
 	freenect_start_depth(f_dev);
 	freenect_start_video(f_dev);

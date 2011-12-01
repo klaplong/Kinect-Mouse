@@ -1,5 +1,7 @@
 cmake_minimum_required(VERSION 2.8)
 
+link_directories(/usr/local/lib64)
+
 add_executable(kmouse kinect_mouse.c)
 
 find_package(Threads REQUIRED)
