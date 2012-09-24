@@ -13,6 +13,8 @@ Required Libraries:
  -- libfreenect
  -- libx11-dev
  -- libxtst-dev
+ -- freeglut3-dev
+ -- libxmu-dev
 
 To build: 
 
