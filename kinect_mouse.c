@@ -90,14 +90,6 @@ int snstvty;
 int pause = 0;
 int pusx = 0, pusy = 0;
 
-int thres = 1000;
-int click_thres = 600;
-int click_n = 0;
-int click_t = 3;
-int rleas_n = 0;
-int rleas_t = 2;
-
-
 pthread_cond_t gl_frame_cond = PTHREAD_COND_INITIALIZER;
 int got_frames = 0;
 
@@ -132,17 +124,6 @@ void DrawGLScene()
     glTexCoord2f(1, 1); glVertex3f(640,480,0);
     glTexCoord2f(0, 1); glVertex3f(0,480,0);
     glEnd();
-
-    // glBindTexture(GL_TEXTURE_2D, gl_rgb_tex);
-    // glTexImage2D(GL_TEXTURE_2D, 0, 3, 640, 480, 0, GL_RGB, GL_UNSIGNED_BYTE, gl_rgb_front);
-
-    // glBegin(GL_TRIANGLE_FAN);
-    // glColor4f(255.0f, 255.0f, 255.0f, 255.0f);
-    // glTexCoord2f(0, 0); glVertex3f(640,0,0);
-    // glTexCoord2f(1, 0); glVertex3f(1280,0,0);
-    // glTexCoord2f(1, 1); glVertex3f(1280,480,0);
-    // glTexCoord2f(0, 1); glVertex3f(640,480,0);
-    // glEnd();
 
     glutSwapBuffers();
 }
@@ -200,14 +181,6 @@ void keyPressed(unsigned char key, int x, int y)
             tmprot-=0.1;
             printf("\n %f \n", tmprot);
         break;
-        case 'm':
-            thres ++;
-            printf("\n thres: %d \n", thres);
-        break;
-        case 'l':
-            thres --;
-            printf("\n thres: %d \n", thres);
-        break;
     }
 
 }
@@ -234,10 +207,6 @@ void InitGL(int Width, int Height)
     glBindTexture(GL_TEXTURE_2D, gl_depth_tex);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    // glGenTextures(1, &gl_rgb_tex);
-    // glBindTexture(GL_TEXTURE_2D, gl_rgb_tex);
-    // glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    // glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     ReSizeGLScene(Width, Height);
 }
 
@@ -271,15 +240,6 @@ int click_h = 100;
 int click_w = 320;
 
 int in_click_area(int x, int y) {
-    // int left = 640 - click_w;
-    // int right = 640;
-    // int top = 480 - click_h;
-    // int bottom = 480;
-
-    // if ((x > left) && (x < right) && (y > top) && (y < bottom)) {
-    //     return 1;
-    // }
-
     if (x > 640 - click_w) {
         return 1;
     }
@@ -371,21 +331,6 @@ void depth_cb(freenect_device *dev, void *v_depth, uint32_t timestamp)
             if(my > tmousey) tmousey+= (my - tmousey) / 7;
             if(my < tmousey) tmousey-= (tmousey - my) / 7;
 
-            // if((pusx <= (mx + 15))  && (pusx >= (mx - 15)) && (pusy <= (my + 15))  && (pusy >= (my - 15))) {
-            //  pause++;
-            //  printf("\n%d\n", pause);
-            // } else {
-            //  pusx = mx;
-            //  pusy = my;
-            //  pause = 0;
-            // }
-
-            // if(pause > 15) {
-            //  pause = -30;
-            //  XTestFakeButtonEvent(display, 1, TRUE, CurrentTime);
-            //  XTestFakeButtonEvent(display, 1, FALSE, CurrentTime);
-            // }
-
             if (any_in_click_area) {
                 XTestFakeButtonEvent(display, 1, TRUE, CurrentTime);
             }
@@ -393,14 +338,8 @@ void depth_cb(freenect_device *dev, void *v_depth, uint32_t timestamp)
                 XTestFakeButtonEvent(display, 1, FALSE, CurrentTime);
             }
 
-            //printf("-- %d x %d -- \n", mx, my);
-
             XTestFakeMotionEvent(display, -1, tmousex-200, tmousey-200, CurrentTime);
             XSync(display, 0);
-
-            //printf("\n\n %d  -  %d \n\n", mx, my);
-
-
         }
     }
 
@@ -414,7 +353,6 @@ void rgb_cb(freenect_device *dev, void *rgb, uint32_t timestamp)
 {
     pthread_mutex_lock(&gl_backbuf_mutex);
     got_frames++;
-//  memcpy(gl_rgb_back, rgb, FREENECT_VIDEO_RGB_SIZE);
     memcpy(gl_rgb_back, rgb, 640*480*3);
     pthread_cond_signal(&gl_frame_cond);
     pthread_mutex_unlock(&gl_backbuf_mutex);
@@ -426,8 +364,6 @@ void *freenect_threadfunc(void *arg)
     freenect_set_led(f_dev,LED_GREEN);
     freenect_set_depth_callback(f_dev, depth_cb);
     freenect_set_video_callback(f_dev, rgb_cb);
-//  freenect_set_video_format(f_dev, FREENECT_VIDEO_RGB);
-//  freenect_set_depth_format(f_dev, FREENECT_DEPTH_11BIT);
 
     freenect_set_video_mode(f_dev, freenect_find_video_mode(FREENECT_RESOLUTION_MEDIUM, FREENECT_VIDEO_RGB));
     freenect_set_depth_mode(f_dev, freenect_find_depth_mode(FREENECT_RESOLUTION_MEDIUM, FREENECT_DEPTH_11BIT));
@@ -445,7 +381,6 @@ void *freenect_threadfunc(void *arg)
         state = freenect_get_tilt_state(f_dev);;
         double dx,dy,dz;
         freenect_get_mks_accel(state, &dx, &dy, &dz);
-        //printf("\r raw acceleration: %4d %4d %4d  mks acceleration: %4f %4f %4f\r", ax, ay, az, dx, dy, dz);
         fflush(stdout);
     }
 
