@@ -90,6 +90,13 @@ int snstvty;
 int pause = 0;
 int pusx = 0, pusy = 0;
 
+int thres = 1000;
+int click_thres = 600;
+int click_n = 0;
+int click_t = 3;
+int rleas_n = 0;
+int rleas_t = 2;
+
 
 pthread_cond_t gl_frame_cond = PTHREAD_COND_INITIALIZER;
 int got_frames = 0;
@@ -115,7 +122,7 @@ void DrawGLScene()
     glBindTexture(GL_TEXTURE_2D, gl_depth_tex);
     glTexImage2D(GL_TEXTURE_2D, 0, 3, 640, 480, 0, GL_RGB, GL_UNSIGNED_BYTE, gl_depth_front);
 
-    glTranslated(1280, 0, 0);
+    glTranslated(640, 0, 0);
     glScalef(-1, 1, 1);
 
     glBegin(GL_TRIANGLE_FAN);
@@ -126,16 +133,16 @@ void DrawGLScene()
     glTexCoord2f(0, 1); glVertex3f(0,480,0);
     glEnd();
 
-    glBindTexture(GL_TEXTURE_2D, gl_rgb_tex);
-    glTexImage2D(GL_TEXTURE_2D, 0, 3, 640, 480, 0, GL_RGB, GL_UNSIGNED_BYTE, gl_rgb_front);
+    // glBindTexture(GL_TEXTURE_2D, gl_rgb_tex);
+    // glTexImage2D(GL_TEXTURE_2D, 0, 3, 640, 480, 0, GL_RGB, GL_UNSIGNED_BYTE, gl_rgb_front);
 
-    glBegin(GL_TRIANGLE_FAN);
-    glColor4f(255.0f, 255.0f, 255.0f, 255.0f);
-    glTexCoord2f(0, 0); glVertex3f(640,0,0);
-    glTexCoord2f(1, 0); glVertex3f(1280,0,0);
-    glTexCoord2f(1, 1); glVertex3f(1280,480,0);
-    glTexCoord2f(0, 1); glVertex3f(640,480,0);
-    glEnd();
+    // glBegin(GL_TRIANGLE_FAN);
+    // glColor4f(255.0f, 255.0f, 255.0f, 255.0f);
+    // glTexCoord2f(0, 0); glVertex3f(640,0,0);
+    // glTexCoord2f(1, 0); glVertex3f(1280,0,0);
+    // glTexCoord2f(1, 1); glVertex3f(1280,480,0);
+    // glTexCoord2f(0, 1); glVertex3f(640,480,0);
+    // glEnd();
 
     glutSwapBuffers();
 }
@@ -193,6 +200,14 @@ void keyPressed(unsigned char key, int x, int y)
             tmprot-=0.1;
             printf("\n %f \n", tmprot);
         break;
+        case 'm':
+            thres ++;
+            printf("\n thres: %d \n", thres);
+        break;
+        case 'l':
+            thres --;
+            printf("\n thres: %d \n", thres);
+        break;
     }
 
 }
@@ -202,7 +217,7 @@ void ReSizeGLScene(int Width, int Height)
     glViewport(0,0,Width,Height);
     glMatrixMode(GL_PROJECTION);
     glLoadIdentity();
-    glOrtho (0, 1280, 480, 0, -1.0f, 1.0f);
+    glOrtho (0, 640, 480, 0, -1.0f, 1.0f);
     glMatrixMode(GL_MODELVIEW);
 }
 
@@ -219,10 +234,10 @@ void InitGL(int Width, int Height)
     glBindTexture(GL_TEXTURE_2D, gl_depth_tex);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glGenTextures(1, &gl_rgb_tex);
-    glBindTexture(GL_TEXTURE_2D, gl_rgb_tex);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    // glGenTextures(1, &gl_rgb_tex);
+    // glBindTexture(GL_TEXTURE_2D, gl_rgb_tex);
+    // glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    // glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     ReSizeGLScene(Width, Height);
 }
 
@@ -233,7 +248,7 @@ void *gl_threadfunc(void *arg)
     glutInit(&g_argc, g_argv);
 
     glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE | GLUT_ALPHA | GLUT_DEPTH);
-    glutInitWindowSize(1280, 480);
+    glutInitWindowSize(640, 480);
     glutInitWindowPosition(0, 0);
 
     window = glutCreateWindow("Ooblik's Kinect Demo");
@@ -243,7 +258,7 @@ void *gl_threadfunc(void *arg)
     glutReshapeFunc(&ReSizeGLScene);
     glutKeyboardFunc(&keyPressed);
 
-    InitGL(1280, 480);
+    InitGL(640, 480);
 
     glutMainLoop();
 
@@ -253,20 +268,26 @@ void *gl_threadfunc(void *arg)
 uint16_t t_gamma[2048];
 
 int click_h = 100;
-int click_w = 120;
+int click_w = 320;
 
 int in_click_area(int x, int y) {
-    int left = 640 - click_w;
-    int right = 640;
-    int top = 480 - click_h;
-    int bottom = 480;
+    // int left = 640 - click_w;
+    // int right = 640;
+    // int top = 480 - click_h;
+    // int bottom = 480;
 
-    if ((x > left) && (x < right) && (y > top) && (y < bottom)) {
+    // if ((x > left) && (x < right) && (y > top) && (y < bottom)) {
+    //     return 1;
+    // }
+
+    if (x > 640 - click_w) {
         return 1;
     }
 
     return 0;
 }
+
+int prev_alert = 0;
 
 void depth_cb(freenect_device *dev, void *v_depth, uint32_t timestamp)
 {
@@ -324,21 +345,9 @@ void depth_cb(freenect_device *dev, void *v_depth, uint32_t timestamp)
         }
     }
 
-    int y = 480 - click_h;
-    int x_start = 640 - click_w;
-    for (i = 0; i < click_w; i ++) {
-        int x = x_start + i;
-        int index = 3 * (x + 640 * y);
-        gl_depth_back[index + 0] = 0;
-        gl_depth_back[index + 1] = 255;
-        gl_depth_back[index + 2] = 0;
-    }
-
     int x = 640 - click_w;
-    int y_start = 480 - click_h;
-    for (i = 0; i < click_h; i ++) {
-        int y = y_start + i;
-        int index = 3 * (x + 640 * y);
+    for (i = 0; i < 480; i ++) {
+        int index = 3 * (x + 640 * i);
         gl_depth_back[index + 0] = 0;
         gl_depth_back[index + 1] = 255;
         gl_depth_back[index + 2] = 0;
@@ -351,7 +360,7 @@ void depth_cb(freenect_device *dev, void *v_depth, uint32_t timestamp)
         if(first) {
             pointerx = ((px-640.0f) / -1);
             pointery = (py);
-            mousex = ((pointerx / 630.0f) * screenw);
+            mousex = ((((pointerx-click_w) / (630.0f - click_w))) * screenw);
             mousey = ((pointery / 470.0f) * screenh);
             int mx , my;
             mx = mousex;
