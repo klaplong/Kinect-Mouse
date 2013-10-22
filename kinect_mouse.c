@@ -80,12 +80,22 @@ freenect_device *f_dev;
 int freenect_angle = 17;
 int freenect_led;
 
-
 float pointerx = 0, pointery = 0;
 float mousex = 0, mousey = 0;
-float tmousex = 0, tmousey = 0;
+float tmousex = 0.0f, tmousey = 0.0f;
+float prox_min_x = 40.0f;
+float prox_min_y = 25.0f;
+int last_px, last_py;
+int steps = 8;
 int screenw = 0, screenh = 0;
 int snstvty;
+
+int click_w = 320;
+int point_height = 0;
+int point_top = 0;
+int point_bottom = 0;
+
+int min_click = 500;
 
 int pause = 0;
 int pusx = 0, pusy = 0;
@@ -236,11 +246,16 @@ void *gl_threadfunc(void *arg)
 
 uint16_t t_gamma[2048];
 
-int click_h = 100;
-int click_w = 320;
-
 int in_click_area(int x, int y) {
     if (x > 640 - click_w) {
+        return 1;
+    }
+
+    return 0;
+}
+
+int in_point_area(int x, int y) {
+    if ((x < click_w) && (y > point_top) && (y < point_bottom)) {
         return 1;
     }
 
@@ -256,7 +271,7 @@ void depth_cb(freenect_device *dev, void *v_depth, uint32_t timestamp)
     int px = 0 , py = 0;
     int tx = 0 , ty = 0;
     int alert = 0;
-    int any_in_click_area = 0;
+    int n_in_click_area = 0;
     uint16_t *depth = v_depth;
 
     pthread_mutex_lock(&gl_backbuf_mutex);
@@ -273,19 +288,21 @@ void depth_cb(freenect_device *dev, void *v_depth, uint32_t timestamp)
         int close_enough = pval >> 8;
 
         if (close_enough == 0) {
-            int this_in_click_area;
+            int this_in_click_area, this_in_point_area;
 
             gl_depth_back[3*i+0] = 255;
             gl_depth_back[3*i+1] = 0;
             gl_depth_back[3*i+2] = 0;
 
             this_in_click_area = in_click_area(tx, ty);
-            if (!any_in_click_area && this_in_click_area) {
-                any_in_click_area = 1;
+            if (this_in_click_area) {
+                n_in_click_area ++;
             }
 
-            if (!this_in_click_area) {
-                alert++;
+            this_in_point_area = in_point_area(tx, ty);
+
+            alert++;
+            if (!this_in_click_area && this_in_point_area) {
                 if (!first) {
                     first = i;
                     px = tx;
@@ -306,8 +323,21 @@ void depth_cb(freenect_device *dev, void *v_depth, uint32_t timestamp)
     }
 
     int x = 640 - click_w;
+    int index;
     for (i = 0; i < 480; i ++) {
-        int index = 3 * (x + 640 * i);
+        index = 3 * (x + 640 * i);
+        gl_depth_back[index + 0] = 0;
+        gl_depth_back[index + 1] = 255;
+        gl_depth_back[index + 2] = 0;
+    }
+    for (i = 0; i < click_w; i ++) {
+        index = 3 * (i + 640 * point_top);
+        gl_depth_back[index + 0] = 0;
+        gl_depth_back[index + 1] = 255;
+        gl_depth_back[index + 2] = 0;
+    }
+    for (i = 0; i < click_w; i ++) {
+        index = 3 * (i + 640 * point_bottom);
         gl_depth_back[index + 0] = 0;
         gl_depth_back[index + 1] = 255;
         gl_depth_back[index + 2] = 0;
@@ -317,30 +347,57 @@ void depth_cb(freenect_device *dev, void *v_depth, uint32_t timestamp)
         printf("\n!!!TOO CLOSE!!!\n");
 
     } else {
+        if (!first) {
+            px = last_px;
+            py = last_py;
+            first = 1;
+        }
         if(first) {
             pointerx = ((px-640.0f) / -1);
-            pointery = (py);
-            mousex = ((((pointerx-click_w) / (630.0f - click_w))) * screenw);
-            mousey = ((pointery / 470.0f) * screenh);
+            pointery = py;
+            mousex = ((pointerx-click_w) / (630.0f - click_w)) * screenw;
+            mousey = ((pointery - point_top) / (float)point_height) * screenh;
             int mx , my;
-            mx = mousex;
-            my = mousey;
 
-            if(mx > tmousex) tmousex+= (mx - tmousex) / 7;
-            if(mx < tmousex) tmousex-= (tmousex - mx) / 7;
-            if(my > tmousey) tmousey+= (my - tmousey) / 7;
-            if(my < tmousey) tmousey-= (tmousey - my) / 7;
-
-            if (any_in_click_area) {
+            printf("%d\n", n_in_click_area);
+            if (n_in_click_area >= min_click) {
                 XTestFakeButtonEvent(display, 1, TRUE, CurrentTime);
             }
             else {
                 XTestFakeButtonEvent(display, 1, FALSE, CurrentTime);
             }
 
-            XTestFakeMotionEvent(display, -1, tmousex-200, tmousey-200, CurrentTime);
+            /* Smooth move. */
+            float prox_x = tmousex - mousex;
+            prox_x *= prox_x;
+            float prox_y = tmousey - mousey;
+            prox_y *= prox_y;
+
+            float speed_x, speed_y;
+
+            if (prox_x > prox_min_x) {
+                speed_x = -(tmousex - mousex) / (float)steps;
+            }
+            else {
+                speed_x = -(tmousex - mousex) / (steps * 5.0f);
+            }
+            tmousex += speed_x;
+
+            if (prox_y > prox_min_y) {
+                speed_y = -(tmousey - mousey) / (float)steps;
+            }
+            else {
+                speed_y = -(tmousey - mousey) / (steps * 5.0f);
+            }
+            tmousey += speed_y;
+
+
+            XTestFakeMotionEvent(display, -1, tmousex-200, tmousey, CurrentTime);
             XSync(display, 0);
         }
+
+        last_px = px;
+        last_py = py;
     }
 
 
@@ -423,6 +480,16 @@ int main(int argc, char **argv)
 
     screenw += 200;
     screenh += 200;
+
+    point_height = (click_w * screenh) / screenw;
+    point_top = 240 - point_height / 2;
+    point_bottom = 240 + point_height / 2;
+
+    tmousex = screenw / 2.0f;
+    tmousey = screenh / 2.0f;
+
+    prox_min_x *= prox_min_x;
+    prox_min_y *= prox_min_y;
 
     int i;
     for (i=0; i<2048; i++) {
