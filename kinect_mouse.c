@@ -90,12 +90,23 @@ int steps = 8;
 int screenw = 0, screenh = 0;
 int snstvty;
 
-int click_w = 320;
-int point_height = 0;
+int click_w = 280;
+int gap = 30;
+int point_w = 0;
+int point_extr_h = 50;
+int point_left = 0;
+int point_extr_left = 0;
+int point_right = 0;
+int point_extr_right = 0;
+int point_h = 0;
+int point_extr_v = 20;
 int point_top = 0;
+int point_extr_top = 0;
 int point_bottom = 0;
+int point_extr_bottom = 0;
 
 int min_click = 500;
+int click = 0;
 
 int pause = 0;
 int pusx = 0, pusy = 0;
@@ -136,6 +147,20 @@ void DrawGLScene()
     glEnd();
 
     glutSwapBuffers();
+}
+
+void calc_sizes() {
+    point_w = 640 - click_w - gap - 2 * point_extr_h;
+    point_extr_right = 0;
+    point_right = point_extr_h;
+    point_left = point_right + point_w;
+    point_extr_left = point_left + point_extr_h;
+
+    point_h = (point_w * screenh) / screenw;
+    point_top = 240 - point_h / 2;
+    point_extr_top = point_top - point_extr_v;
+    point_bottom = 240 + point_h / 2;
+    point_extr_bottom = point_bottom + point_extr_v;
 }
 
 void keyPressed(unsigned char key, int x, int y)
@@ -191,6 +216,12 @@ void keyPressed(unsigned char key, int x, int y)
             tmprot-=0.1;
             printf("\n %f \n", tmprot);
         break;
+        case 'r':
+            printf("New size: ");
+            scanf("%dx%d\n", &screenw, &screenh);
+            screenw += 200;
+            screenh += 200;
+            calc_sizes();
     }
 
 }
@@ -255,7 +286,7 @@ int in_click_area(int x, int y) {
 }
 
 int in_point_area(int x, int y) {
-    if ((x < click_w) && (y > point_top) && (y < point_bottom)) {
+    if ((x < point_extr_left) && (y > point_extr_top) && (y < point_extr_bottom)) {
         return 1;
     }
 
@@ -272,6 +303,9 @@ void depth_cb(freenect_device *dev, void *v_depth, uint32_t timestamp)
     int tx = 0 , ty = 0;
     int alert = 0;
     int n_in_click_area = 0;
+    int n_in_point_area = 0;
+    float total_x = 0;
+    float total_y = 0;
     uint16_t *depth = v_depth;
 
     pthread_mutex_lock(&gl_backbuf_mutex);
@@ -300,13 +334,16 @@ void depth_cb(freenect_device *dev, void *v_depth, uint32_t timestamp)
             }
 
             this_in_point_area = in_point_area(tx, ty);
+            if (this_in_point_area) {
+                n_in_point_area ++;
+                total_x += tx;
+                total_y += ty;
+            }
 
             alert++;
             if (!this_in_click_area && this_in_point_area) {
                 if (!first) {
                     first = i;
-                    px = tx;
-                    py = ty;
                 }
             }
         }
@@ -322,22 +359,68 @@ void depth_cb(freenect_device *dev, void *v_depth, uint32_t timestamp)
         }
     }
 
-    int x = 640 - click_w;
     int index;
+
+    /* Click right border */
+    int x = 640 - click_w;
     for (i = 0; i < 480; i ++) {
         index = 3 * (x + 640 * i);
         gl_depth_back[index + 0] = 0;
         gl_depth_back[index + 1] = 255;
         gl_depth_back[index + 2] = 0;
     }
-    for (i = 0; i < click_w; i ++) {
+
+    /* Point top */
+    for (i = 0; i < point_extr_left; i ++) {
         index = 3 * (i + 640 * point_top);
         gl_depth_back[index + 0] = 0;
         gl_depth_back[index + 1] = 255;
         gl_depth_back[index + 2] = 0;
     }
-    for (i = 0; i < click_w; i ++) {
+
+    /* Point extra top */
+    for (i = 0; i < point_extr_left; i ++) {
+        index = 3 * (i + 640 * point_extr_top);
+        gl_depth_back[index + 0] = 0;
+        gl_depth_back[index + 1] = 255;
+        gl_depth_back[index + 2] = 0;
+    }
+
+    /* Point bottom */
+    for (i = 0; i < point_extr_left; i ++) {
         index = 3 * (i + 640 * point_bottom);
+        gl_depth_back[index + 0] = 0;
+        gl_depth_back[index + 1] = 255;
+        gl_depth_back[index + 2] = 0;
+    }
+
+    /* Point extra bottom */
+    for (i = 0; i < point_extr_left; i ++) {
+        index = 3 * (i + 640 * point_extr_bottom);
+        gl_depth_back[index + 0] = 0;
+        gl_depth_back[index + 1] = 255;
+        gl_depth_back[index + 2] = 0;
+    }
+
+    /* Point left */
+    for (i = 0; i < 480; i ++) {
+        index = 3 * (point_left + 640 * i);
+        gl_depth_back[index + 0] = 0;
+        gl_depth_back[index + 1] = 255;
+        gl_depth_back[index + 2] = 0;
+    }
+
+    /* Point extra left */
+    for (i = 0; i < 480; i ++) {
+        index = 3 * (point_extr_left + 640 * i);
+        gl_depth_back[index + 0] = 0;
+        gl_depth_back[index + 1] = 255;
+        gl_depth_back[index + 2] = 0;
+    }
+
+    /* Point right */
+    for (i = 0; i < 480; i ++) {
+        index = 3 * (point_right + 640 * i);
         gl_depth_back[index + 0] = 0;
         gl_depth_back[index + 1] = 255;
         gl_depth_back[index + 2] = 0;
@@ -345,25 +428,35 @@ void depth_cb(freenect_device *dev, void *v_depth, uint32_t timestamp)
 
     if(alert > snstvty) {
         printf("\n!!!TOO CLOSE!!!\n");
-
-    } else {
+    }
+    else {
         if (!first) {
             px = last_px;
             py = last_py;
             first = 1;
         }
+        else {
+            px = total_x / n_in_point_area;
+            py = total_y / n_in_point_area;
+        }
         if(first) {
-            pointerx = ((px-640.0f) / -1);
+            pointerx = px;
             pointery = py;
-            mousex = ((pointerx-click_w) / (630.0f - click_w)) * screenw;
-            mousey = ((pointery - point_top) / (float)point_height) * screenh;
-            int mx , my;
+            mousex = ((point_w - (pointerx - point_extr_h)) / (float)point_w) * screenw;
+            mousey = ((pointery - point_top) / (float)point_h) * screenh;
 
-            printf("%d\n", n_in_click_area);
             if (n_in_click_area >= min_click) {
                 XTestFakeButtonEvent(display, 1, TRUE, CurrentTime);
+                if (!click) {
+                    click = 1;
+                    printf("Click");
+                }
             }
             else {
+                if (click) {
+                    printf("ed!\n");
+                    click = 0;
+                }
                 XTestFakeButtonEvent(display, 1, FALSE, CurrentTime);
             }
 
@@ -481,9 +574,7 @@ int main(int argc, char **argv)
     screenw += 200;
     screenh += 200;
 
-    point_height = (click_w * screenh) / screenw;
-    point_top = 240 - point_height / 2;
-    point_bottom = 240 + point_height / 2;
+    calc_sizes();
 
     tmousex = screenw / 2.0f;
     tmousey = screenh / 2.0f;
