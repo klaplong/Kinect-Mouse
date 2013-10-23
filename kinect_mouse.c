@@ -90,7 +90,7 @@ int screenw = 0, screenh = 0;
 int snstvty;
 
 int click_w = 280;
-int click_wait = 20;
+int click_wait = 8;
 int click_wait_n = 0;
 int min_click = 500;
 int click = 0;
@@ -264,7 +264,7 @@ void *gl_threadfunc(void *arg) {
     glutInitWindowSize(640, 480);
     glutInitWindowPosition(0, 0);
 
-    window = glutCreateWindow("Ooblik's Kinect Demo");
+    window = glutCreateWindow("Kinect Mouse Control Map");
 
     glutDisplayFunc(&DrawGLScene);
     glutIdleFunc(&DrawGLScene);
@@ -316,6 +316,32 @@ void draw_line_h(int y, int from, int to) {
     }
 }
 
+void draw_area_lines() {
+    /* Click right border */
+    draw_line_v(640 - click_w, 0, 480);
+    /* Point top */
+    draw_line_h(point_top, 0, point_extr_left);
+    /* Point extra top */
+    draw_line_h(point_extr_top, 0, point_extr_left);
+    /* Point bottom */
+    draw_line_h(point_bottom, 0, point_extr_left);
+    /* Point extra bottom */
+    draw_line_h(point_extr_bottom, 0, point_extr_left);
+    /* Point left */
+    draw_line_v(point_left, point_extr_top, point_extr_bottom);
+    /* Point extra left */
+    draw_line_v(point_extr_left, point_extr_top, point_extr_bottom);
+    /* Point right */
+    draw_line_v(point_right, point_extr_top, point_extr_bottom);
+}
+
+void draw_exc(int x, int y) {
+    draw_line_v(x, y, y + 10);
+    draw_line_v(x + 1, y, y + 10);
+    draw_point(x, y + 12, 0, 255, 0);
+    draw_point(x + 1, y + 12, 0, 255, 0);
+}
+
 void depth_cb(freenect_device *dev, void *v_depth, uint32_t timestamp) {
     int i;
     int px = 0 , py = 0;
@@ -337,7 +363,7 @@ void depth_cb(freenect_device *dev, void *v_depth, uint32_t timestamp) {
         int lb = pval & 0xff;
 
         tx++;
-        if(tx >= 640) {
+        if (tx >= 640) {
             tx = 0;
             ty++;
         }
@@ -371,25 +397,10 @@ void depth_cb(freenect_device *dev, void *v_depth, uint32_t timestamp) {
         }
     }
 
-    /* Click right border */
-    draw_line_v(640 - click_w, 0, 480);
-    /* Point top */
-    draw_line_h(point_top, 0, point_extr_left);
-    /* Point extra top */
-    draw_line_h(point_extr_top, 0, point_extr_left);
-    /* Point bottom */
-    draw_line_h(point_bottom, 0, point_extr_left);
-    /* Point extra bottom */
-    draw_line_h(point_extr_bottom, 0, point_extr_left);
-    /* Point left */
-    draw_line_v(point_left, point_extr_top, point_extr_bottom);
-    /* Point extra left */
-    draw_line_v(point_extr_left, point_extr_top, point_extr_bottom);
-    /* Point right */
-    draw_line_v(point_right, point_extr_top, point_extr_bottom);
+    draw_area_lines();
 
     if (alert > snstvty) {
-        printf("\n!!!TOO CLOSE!!!\n");
+        draw_exc(640 - 15, 5);
     }
     else {
         if (!alert) {
@@ -425,7 +436,7 @@ void depth_cb(freenect_device *dev, void *v_depth, uint32_t timestamp) {
             }
 
             if (click_wait_n) {
-                printf("waiting\n");
+                // printf("waiting\n");
                 click_wait_n --;
             }
             else {
