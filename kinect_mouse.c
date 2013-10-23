@@ -111,6 +111,8 @@ int click = 0;
 int pause = 0;
 int pusx = 0, pusy = 0;
 
+int last_alert = 0;
+
 pthread_cond_t gl_frame_cond = PTHREAD_COND_INITIALIZER;
 int got_frames = 0;
 
@@ -293,7 +295,26 @@ int in_point_area(int x, int y) {
     return 0;
 }
 
-int prev_alert = 0;
+void draw_point(int x, int y, int r, int g, int b) {
+    int index = 3 * (x + 640 * y);
+    gl_depth_back[index + 0] = r;
+    gl_depth_back[index + 1] = g;
+    gl_depth_back[index + 2] = b;
+}
+
+void draw_line_v(int x, int from, int to) {
+    int i;
+    for (i = from; i < to; i ++) {
+        draw_point(x, i, 0, 255, 0);
+    }
+}
+
+void draw_line_h(int y, int from, int to) {
+    int i;
+    for (i = from; i < to; i ++) {
+        draw_point(i, y, 0, 255, 0);
+    }
+}
 
 void depth_cb(freenect_device *dev, void *v_depth, uint32_t timestamp)
 {
@@ -324,9 +345,7 @@ void depth_cb(freenect_device *dev, void *v_depth, uint32_t timestamp)
         if (close_enough == 0) {
             int this_in_click_area, this_in_point_area;
 
-            gl_depth_back[3*i+0] = 255;
-            gl_depth_back[3*i+1] = 0;
-            gl_depth_back[3*i+2] = 0;
+            draw_point(tx, ty, 255, 0, 0);
 
             this_in_click_area = in_click_area(tx, ty);
             if (this_in_click_area) {
@@ -348,83 +367,29 @@ void depth_cb(freenect_device *dev, void *v_depth, uint32_t timestamp)
             }
         }
         else if (close_enough == 1) {
-            gl_depth_back[3*i+0] = 255;
-            gl_depth_back[3*i+1] = 255;
-            gl_depth_back[3*i+2] = 255;
+            draw_point(tx, ty, 255, 255, 255);
         }
         else {
-            gl_depth_back[3*i+0] = 0;
-            gl_depth_back[3*i+1] = 0;
-            gl_depth_back[3*i+2] = 0;
+            draw_point(tx, ty, 0, 0, 0);
         }
     }
 
-    int index;
-
     /* Click right border */
-    int x = 640 - click_w;
-    for (i = 0; i < 480; i ++) {
-        index = 3 * (x + 640 * i);
-        gl_depth_back[index + 0] = 0;
-        gl_depth_back[index + 1] = 255;
-        gl_depth_back[index + 2] = 0;
-    }
-
+    draw_line_v(640 - click_w, 0, 480);
     /* Point top */
-    for (i = 0; i < point_extr_left; i ++) {
-        index = 3 * (i + 640 * point_top);
-        gl_depth_back[index + 0] = 0;
-        gl_depth_back[index + 1] = 255;
-        gl_depth_back[index + 2] = 0;
-    }
-
+    draw_line_h(point_top, 0, point_extr_left);
     /* Point extra top */
-    for (i = 0; i < point_extr_left; i ++) {
-        index = 3 * (i + 640 * point_extr_top);
-        gl_depth_back[index + 0] = 0;
-        gl_depth_back[index + 1] = 255;
-        gl_depth_back[index + 2] = 0;
-    }
-
+    draw_line_h(point_extr_top, 0, point_extr_left);
     /* Point bottom */
-    for (i = 0; i < point_extr_left; i ++) {
-        index = 3 * (i + 640 * point_bottom);
-        gl_depth_back[index + 0] = 0;
-        gl_depth_back[index + 1] = 255;
-        gl_depth_back[index + 2] = 0;
-    }
-
+    draw_line_h(point_bottom, 0, point_extr_left);
     /* Point extra bottom */
-    for (i = 0; i < point_extr_left; i ++) {
-        index = 3 * (i + 640 * point_extr_bottom);
-        gl_depth_back[index + 0] = 0;
-        gl_depth_back[index + 1] = 255;
-        gl_depth_back[index + 2] = 0;
-    }
-
+    draw_line_h(point_extr_bottom, 0, point_extr_left);
     /* Point left */
-    for (i = 0; i < 480; i ++) {
-        index = 3 * (point_left + 640 * i);
-        gl_depth_back[index + 0] = 0;
-        gl_depth_back[index + 1] = 255;
-        gl_depth_back[index + 2] = 0;
-    }
-
+    draw_line_v(point_left, point_extr_top, point_extr_bottom);
     /* Point extra left */
-    for (i = 0; i < 480; i ++) {
-        index = 3 * (point_extr_left + 640 * i);
-        gl_depth_back[index + 0] = 0;
-        gl_depth_back[index + 1] = 255;
-        gl_depth_back[index + 2] = 0;
-    }
-
+    draw_line_v(point_extr_left, point_extr_top, point_extr_bottom);
     /* Point right */
-    for (i = 0; i < 480; i ++) {
-        index = 3 * (point_right + 640 * i);
-        gl_depth_back[index + 0] = 0;
-        gl_depth_back[index + 1] = 255;
-        gl_depth_back[index + 2] = 0;
-    }
+    draw_line_v(point_right, point_extr_top, point_extr_bottom);
 
     if(alert > snstvty) {
         printf("\n!!!TOO CLOSE!!!\n");
