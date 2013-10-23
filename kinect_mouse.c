@@ -84,7 +84,7 @@ float mousex = 0, mousey = 0;
 float tmousex = 0.0f, tmousey = 0.0f;
 float prox_min_x = 40.0f;
 float prox_min_y = 25.0f;
-int last_px, last_py;
+float last_px, last_py;
 int steps = 8;
 int screenw = 0, screenh = 0;
 int snstvty;
@@ -344,7 +344,7 @@ void draw_exc(int x, int y) {
 
 void depth_cb(freenect_device *dev, void *v_depth, uint32_t timestamp) {
     int i;
-    int px = 0 , py = 0;
+    float px = 0 , py = 0;
     int tx = 0 , ty = 0;
     int alert = 0;
     int n_in_click_area = 0;
@@ -403,7 +403,7 @@ void depth_cb(freenect_device *dev, void *v_depth, uint32_t timestamp) {
         draw_exc(640 - 15, 5);
     }
     else {
-        if (!alert) {
+        if (!n_in_point_area) {
             px = last_px;
             py = last_py;
             alert = 1;
@@ -412,6 +412,9 @@ void depth_cb(freenect_device *dev, void *v_depth, uint32_t timestamp) {
             px = total_x / n_in_point_area;
             py = total_y / n_in_point_area;
         }
+
+        last_px = px;
+        last_py = py;
 
         if (alert) {
             mousex = ((point_w - px + point_extr_h) / (float)point_w) *
@@ -436,7 +439,6 @@ void depth_cb(freenect_device *dev, void *v_depth, uint32_t timestamp) {
             }
 
             if (click_wait_n) {
-                // printf("waiting\n");
                 click_wait_n --;
             }
             else {
@@ -470,9 +472,6 @@ void depth_cb(freenect_device *dev, void *v_depth, uint32_t timestamp) {
                 XSync(display, 0);
             }
         }
-
-        last_px = px;
-        last_py = py;
     }
 
 
