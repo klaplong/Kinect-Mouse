@@ -90,6 +90,11 @@ int screenw = 0, screenh = 0;
 int snstvty;
 
 int click_w = 280;
+int click_wait = 20;
+int click_wait_n = 0;
+int min_click = 500;
+int click = 0;
+
 int gap = 30;
 int point_w = 0;
 int point_extr_h = 50;
@@ -105,9 +110,6 @@ int point_bottom = 0;
 int point_extr_bottom = 0;
 
 int block_mouse = 0;
-
-int min_click = 500;
-int click = 0;
 
 int pause = 0;
 int pusx = 0, pusy = 0;
@@ -409,6 +411,7 @@ void depth_cb(freenect_device *dev, void *v_depth, uint32_t timestamp) {
                 if (!click) {
                     XTestFakeButtonEvent(display, 1, TRUE, CurrentTime);
                     click = 1;
+                    click_wait_n = click_wait;
                     printf("Click");
                 }
             }
@@ -416,36 +419,45 @@ void depth_cb(freenect_device *dev, void *v_depth, uint32_t timestamp) {
                 if (click) {
                     XTestFakeButtonEvent(display, 1, FALSE, CurrentTime);
                     click = 0;
+                    click_wait_n = 0;
                     printf("ed!\n");
                 }
             }
 
-            /* Smooth move. */
-            float prox_x = tmousex - mousex;
-            prox_x *= prox_x;
-            float prox_y = tmousey - mousey;
-            prox_y *= prox_y;
-
-            float speed_x, speed_y;
-
-            if (prox_x > prox_min_x) {
-                speed_x = -(tmousex - mousex) / (float)steps;
+            if (click_wait_n) {
+                printf("waiting\n");
+                click_wait_n --;
             }
             else {
-                speed_x = -(tmousex - mousex) / (steps * 5.0f);
-            }
-            tmousex += speed_x;
 
-            if (prox_y > prox_min_y) {
-                speed_y = -(tmousey - mousey) / (float)steps;
-            }
-            else {
-                speed_y = -(tmousey - mousey) / (steps * 5.0f);
-            }
-            tmousey += speed_y;
+                /* Smooth move. */
+                float prox_x = tmousex - mousex;
+                prox_x *= prox_x;
+                float prox_y = tmousey - mousey;
+                prox_y *= prox_y;
 
-            XTestFakeMotionEvent(display, -1, tmousex-200, tmousey, CurrentTime);
-            XSync(display, 0);
+                float speed_x, speed_y;
+
+                if (prox_x > prox_min_x) {
+                    speed_x = -(tmousex - mousex) / (float)steps;
+                }
+                else {
+                    speed_x = -(tmousex - mousex) / (steps * 5.0f);
+                }
+                tmousex += speed_x;
+
+                if (prox_y > prox_min_y) {
+                    speed_y = -(tmousey - mousey) / (float)steps;
+                }
+                else {
+                    speed_y = -(tmousey - mousey) / (steps * 5.0f);
+                }
+                tmousey += speed_y;
+
+                XTestFakeMotionEvent(display, -1, tmousex-200, tmousey,
+                                     CurrentTime);
+                XSync(display, 0);
+            }
         }
 
         last_px = px;
