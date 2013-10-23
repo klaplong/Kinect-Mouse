@@ -85,6 +85,8 @@ float tmousex = 0.0f, tmousey = 0.0f;
 float prox_min_x = 40.0f;
 float prox_min_y = 25.0f;
 float last_px, last_py;
+float init_mouse_x, init_mouse_y;
+int init_mouse = 50;
 int steps = 8;
 int screenw = 0, screenh = 0;
 int snstvty;
@@ -96,6 +98,7 @@ int min_click = 500;
 int click = 0;
 
 int gap = 30;
+int min_point = 300;
 int point_w = 0;
 int point_extr_h = 50;
 int point_left = 0;
@@ -403,7 +406,7 @@ void depth_cb(freenect_device *dev, void *v_depth, uint32_t timestamp) {
         draw_exc(640 - 15, 5);
     }
     else {
-        if (!n_in_point_area) {
+        if (n_in_point_area < min_point) {
             px = last_px;
             py = last_py;
             alert = 1;
@@ -417,9 +420,16 @@ void depth_cb(freenect_device *dev, void *v_depth, uint32_t timestamp) {
         last_py = py;
 
         if (alert) {
-            mousex = ((point_w - px + point_extr_h) / (float)point_w) *
-                     screenw;
-            mousey = ((py - point_top) / (float)point_h) * screenh;
+            if (init_mouse) {
+                mousex = init_mouse_x;
+                mousey = init_mouse_y;
+                init_mouse--;
+            }
+            else {
+                mousex = ((point_w - px + point_extr_h) / (float)point_w) *
+                         screenw;
+                mousey = ((py - point_top) / (float)point_h) * screenh;
+            }
 
             if (n_in_click_area >= min_click) {
                 if (!click) {
@@ -429,13 +439,11 @@ void depth_cb(freenect_device *dev, void *v_depth, uint32_t timestamp) {
                     printf("Click");
                 }
             }
-            else {
-                if (click) {
-                    XTestFakeButtonEvent(display, 1, FALSE, CurrentTime);
-                    click = 0;
-                    click_wait_n = 0;
-                    printf("ed!\n");
-                }
+            else if (click) {
+                XTestFakeButtonEvent(display, 1, FALSE, CurrentTime);
+                click = 0;
+                click_wait_n = 0;
+                printf("ed!\n");
             }
 
             if (click_wait_n) {
@@ -473,7 +481,6 @@ void depth_cb(freenect_device *dev, void *v_depth, uint32_t timestamp) {
             }
         }
     }
-
 
     got_frames++;
     pthread_cond_signal(&gl_frame_cond);
@@ -530,6 +537,8 @@ void *freenect_threadfunc(void *arg)
 
 int main(int argc, char **argv)
 {
+    block_mouse = 1;
+
     int res;
 
     printf("\n===Kinect Mouse===\n");
@@ -557,8 +566,8 @@ int main(int argc, char **argv)
 
     calc_sizes();
 
-    tmousex = screenw / 2.0f;
-    tmousey = screenh / 2.0f;
+    init_mouse_x = screenw / 2.0f;
+    init_mouse_y = screenh / 2.0f;
 
     prox_min_x *= prox_min_x;
     prox_min_y *= prox_min_y;
@@ -600,6 +609,8 @@ int main(int argc, char **argv)
         printf("Could Not Create Thread\n");
         return 1;
     }
+
+    block_mouse = 0;
 
     gl_threadfunc(NULL);
 
