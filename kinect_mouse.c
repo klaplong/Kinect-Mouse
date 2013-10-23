@@ -80,7 +80,6 @@ freenect_device *f_dev;
 int freenect_angle = 17;
 int freenect_led;
 
-float pointerx = 0, pointery = 0;
 float mousex = 0, mousey = 0;
 float tmousex = 0.0f, tmousey = 0.0f;
 float prox_min_x = 40.0f;
@@ -105,6 +104,8 @@ int point_extr_top = 0;
 int point_bottom = 0;
 int point_extr_bottom = 0;
 
+int block_mouse = 0;
+
 int min_click = 500;
 int click = 0;
 
@@ -116,8 +117,7 @@ int last_alert = 0;
 pthread_cond_t gl_frame_cond = PTHREAD_COND_INITIALIZER;
 int got_frames = 0;
 
-void DrawGLScene()
-{
+void DrawGLScene() {
     pthread_mutex_lock(&gl_backbuf_mutex);
 
     while (got_frames < 2) {
@@ -165,8 +165,7 @@ void calc_sizes() {
     point_extr_bottom = point_bottom + point_extr_v;
 }
 
-void keyPressed(unsigned char key, int x, int y)
-{
+void keyPressed(unsigned char key, int x, int y) {
     switch(key) {
         case 27:
             die = 1;
@@ -219,17 +218,19 @@ void keyPressed(unsigned char key, int x, int y)
             printf("\n %f \n", tmprot);
         break;
         case 'r':
+            block_mouse = 1;
             printf("New size: ");
             scanf("%dx%d\n", &screenw, &screenh);
+            printf("Screen size set to %dx%d\n", screenw, screenh);
             screenw += 200;
             screenh += 200;
             calc_sizes();
+            block_mouse = 0;
     }
 
 }
 
-void ReSizeGLScene(int Width, int Height)
-{
+void ReSizeGLScene(int Width, int Height) {
     glViewport(0,0,Width,Height);
     glMatrixMode(GL_PROJECTION);
     glLoadIdentity();
@@ -237,8 +238,7 @@ void ReSizeGLScene(int Width, int Height)
     glMatrixMode(GL_MODELVIEW);
 }
 
-void InitGL(int Width, int Height)
-{
+void InitGL(int Width, int Height) {
     glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
     glClearDepth(1.0);
     glDepthFunc(GL_LESS);
@@ -253,8 +253,7 @@ void InitGL(int Width, int Height)
     ReSizeGLScene(Width, Height);
 }
 
-void *gl_threadfunc(void *arg)
-{
+void *gl_threadfunc(void *arg) {
     printf("GL thread\n");
 
     glutInit(&g_argc, g_argv);
@@ -283,15 +282,14 @@ int in_click_area(int x, int y) {
     if (x > 640 - click_w) {
         return 1;
     }
-
     return 0;
 }
 
 int in_point_area(int x, int y) {
-    if ((x < point_extr_left) && (y > point_extr_top) && (y < point_extr_bottom)) {
+    if ((x < point_extr_left) && (y > point_extr_top) &&
+        (y < point_extr_bottom)) {
         return 1;
     }
-
     return 0;
 }
 
@@ -316,10 +314,8 @@ void draw_line_h(int y, int from, int to) {
     }
 }
 
-void depth_cb(freenect_device *dev, void *v_depth, uint32_t timestamp)
-{
+void depth_cb(freenect_device *dev, void *v_depth, uint32_t timestamp) {
     int i;
-    int first = 0;
     int px = 0 , py = 0;
     int tx = 0 , ty = 0;
     int alert = 0;
@@ -328,6 +324,10 @@ void depth_cb(freenect_device *dev, void *v_depth, uint32_t timestamp)
     float total_x = 0;
     float total_y = 0;
     uint16_t *depth = v_depth;
+
+    if (block_mouse) {
+        return;
+    }
 
     pthread_mutex_lock(&gl_backbuf_mutex);
     for (i=0; i<640*480; i++) {
@@ -360,11 +360,6 @@ void depth_cb(freenect_device *dev, void *v_depth, uint32_t timestamp)
             }
 
             alert++;
-            if (!this_in_click_area && this_in_point_area) {
-                if (!first) {
-                    first = i;
-                }
-            }
         }
         else if (close_enough == 1) {
             draw_point(tx, ty, 255, 255, 255);
@@ -391,38 +386,38 @@ void depth_cb(freenect_device *dev, void *v_depth, uint32_t timestamp)
     /* Point right */
     draw_line_v(point_right, point_extr_top, point_extr_bottom);
 
-    if(alert > snstvty) {
+    if (alert > snstvty) {
         printf("\n!!!TOO CLOSE!!!\n");
     }
     else {
-        if (!first) {
+        if (!alert) {
             px = last_px;
             py = last_py;
-            first = 1;
+            alert = 1;
         }
         else {
             px = total_x / n_in_point_area;
             py = total_y / n_in_point_area;
         }
-        if(first) {
-            pointerx = px;
-            pointery = py;
-            mousex = ((point_w - (pointerx - point_extr_h)) / (float)point_w) * screenw;
-            mousey = ((pointery - point_top) / (float)point_h) * screenh;
+
+        if (alert) {
+            mousex = ((point_w - px + point_extr_h) / (float)point_w) *
+                     screenw;
+            mousey = ((py - point_top) / (float)point_h) * screenh;
 
             if (n_in_click_area >= min_click) {
-                XTestFakeButtonEvent(display, 1, TRUE, CurrentTime);
                 if (!click) {
+                    XTestFakeButtonEvent(display, 1, TRUE, CurrentTime);
                     click = 1;
                     printf("Click");
                 }
             }
             else {
                 if (click) {
-                    printf("ed!\n");
+                    XTestFakeButtonEvent(display, 1, FALSE, CurrentTime);
                     click = 0;
+                    printf("ed!\n");
                 }
-                XTestFakeButtonEvent(display, 1, FALSE, CurrentTime);
             }
 
             /* Smooth move. */
@@ -448,7 +443,6 @@ void depth_cb(freenect_device *dev, void *v_depth, uint32_t timestamp)
                 speed_y = -(tmousey - mousey) / (steps * 5.0f);
             }
             tmousey += speed_y;
-
 
             XTestFakeMotionEvent(display, -1, tmousex-200, tmousey, CurrentTime);
             XSync(display, 0);
